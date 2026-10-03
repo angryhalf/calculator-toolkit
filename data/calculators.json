@@ -23,7 +23,6 @@
           "defaultValue": 2
         }
       ],
-      "expression": "(-b + sqrt(b^2 - 4*a*c)) / (2*a)",
       "outputUnit": "",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -45,7 +44,6 @@
           "defaultValue": 5
         }
       ],
-      "expression": "pi * r^2",
       "outputUnit": "m²",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -72,7 +70,6 @@
           "defaultValue": 4
         }
       ],
-      "expression": "sqrt(a^2 + b^2)",
       "outputUnit": "",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -99,7 +96,6 @@
           "defaultValue": 10
         }
       ],
-      "expression": "0.5 * m * v^2",
       "outputUnit": "J",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -126,7 +122,6 @@
           "defaultValue": 9.81
         }
       ],
-      "expression": "sqrt(2*h/g)",
       "outputUnit": "s",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -163,7 +158,6 @@
           "defaultValue": 10
         }
       ],
-      "expression": "P * (1 + r/(100*n))^(n*t)",
       "outputUnit": "",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -195,7 +189,6 @@
           "defaultValue": 3
         }
       ],
-      "expression": "bill * (1 + tip/100) / people",
       "outputUnit": "",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -222,7 +215,6 @@
           "defaultValue": 1.75
         }
       ],
-      "expression": "weight / height^2",
       "outputUnit": "kg/m²",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -249,7 +241,6 @@
           "defaultValue": 50
         }
       ],
-      "expression": "(to - from) / abs(from) * 100",
       "outputUnit": "%",
       "createdAt": "2025-06-01T09:00:00.000Z",
       "updatedAt": "2025-06-01T09:00:00.000Z",
@@ -287,6 +278,19 @@
         ]
       },
       "unit": "N"
+    },
+    {
+      "id": "zz-test",
+      "name": "ZZ Test",
+      "slug": "zz-test",
+      "description": "",
+      "subject": null,
+      "inputs": [],
+      "formula": {
+        "kind": "expression",
+        "expression": "1+1"
+      },
+      "unit": ""
     }
   ]
 }

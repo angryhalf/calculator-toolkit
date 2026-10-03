@@ -30,6 +30,7 @@ export default async function Page({ params, searchParams }: Props) {
   if (slug.length > 2) notFound();
 
   const calculators = await getCalculators();
+  const subjects = [...new Set(calculators.map((c) => c.subject).filter((s): s is string => s !== null))];
   const [a, b] = slug;
 
   // /edit — create, or update with ?id=
@@ -37,7 +38,6 @@ export default async function Page({ params, searchParams }: Props) {
     if (b) notFound();
     const calculator = query.id ? calculators.find((c) => c.id === query.id) : undefined;
     if (query.id && !calculator) notFound();
-    const subjects = [...new Set(calculators.map((c) => c.subject).filter((s): s is string => s !== null))];
     return <CalculatorForm key={calculator?.id ?? "new"} subjects={subjects} calculator={calculator} initialSubject={query.subject} />;
   }
 
@@ -49,7 +49,7 @@ export default async function Page({ params, searchParams }: Props) {
   }
 
   // / — home
-  if (!a) return <HomeView calculators={calculators} />;
+  if (!a) return <HomeView calculators={calculators} subjects={subjects} />;
 
   // /<subject> — subject page (a subject exists only while it has calculators)
   if (!b) {

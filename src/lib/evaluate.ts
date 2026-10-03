@@ -26,7 +26,7 @@ function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
   for (let i = 0; i < source.length; ) {
     const rest = source.slice(i);
-    if (rest[0] === " ") { i += 1; continue; }
+    if (/\s/.test(rest[0])) { i += 1; continue; }
     const number = /^[0-9]*\.?[0-9]+/.exec(rest);
     if (number) { tokens.push({ type: "num", value: number[0] }); i += number[0].length; continue; }
     const name = /^[a-zA-Z_][a-zA-Z0-9_]*/.exec(rest);
@@ -114,7 +114,7 @@ export function evaluate(expression: string, variables: Record<string, number>):
           } while (eat(","));
           if (!eat(")")) throw new Error('Missing ")".');
         }
-        const fn = FUNCTIONS[name] ?? FUNCTIONS[name.toLowerCase()];
+        const fn = FUNCTIONS[name.toLowerCase()]; // all keys are lowercase
         if (!fn) throw new Error(`Unknown function "${name}".`);
         return fn(...args);
       }
@@ -142,6 +142,8 @@ function suggest(name: string, candidates: string[]): string | null {
   let best: string | null = null;
   let bestDistance = 3; // only very close matches get suggested
   for (const candidate of candidates) {
+    // Levenshtein is at least the length difference — skip hopeless candidates.
+    if (Math.abs(target.length - candidate.length) >= bestDistance) continue;
     const distance = editDistance(target, candidate.toLowerCase());
     if (distance < bestDistance) {
       best = candidate;
