@@ -1,3 +1,0 @@
-module.exports=[3363,a=>{"use strict";var b=a.i(7997),c=a.i(95936),d=a.i(38904);a.s(["default",0,function(){return(0,b.jsxs)("div",{className:"py-24 text-center",children:[(0,b.jsx)("p",{className:"font-mono text-sm text-muted-foreground",children:"404"}),(0,b.jsx)("h1",{className:"mt-2 text-2xl font-semibold",children:"Not found"}),(0,b.jsx)("p",{className:"mt-1 text-muted-foreground",children:"This calculator or subject doesn’t exist (or was renamed)."}),(0,b.jsx)(c.default,{href:"/",className:(0,d.buttonVariants)({className:"mt-6"}),children:"Back home"})]})}])},17537,function(a){a.n(a.i(3363))}];
-
-//# sourceMappingURL=src_app_not-found_tsx_1863-sq._.js.map
