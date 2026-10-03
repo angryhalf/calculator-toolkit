@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { cache } from "react";
 import { revalidatePath } from "next/cache";
 
 export type CalculatorInput = { label: string; variable: string; defaultValue: number };
@@ -93,6 +95,9 @@ const SEED: Db = {
 };
 
 // All reads/writes go through one promise chain so they never interleave.
+// NOTE: the lock only guards a single Node process. On serverless/multi-instance
+// deployments (Vercel & co.) the file system is read-only or diverges per
+// instance — swap this store for a real database (e.g. SQLite) to scale up.
 let queue: Promise<unknown> = Promise.resolve();
 
 function withLock<T>(task: () => Promise<T>): Promise<T> {
@@ -104,40 +109,83 @@ function withLock<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function read(): Promise<Db> {
+// Parsed-file cache keyed by mtimeMs + size, so repeated requests don't re-read
+// and re-parse the JSON. Safe because every write goes through this process.
+let cacheEntry: { key: string; db: Db } | null = null;
+
+async function diskKey(): Promise<string | null> {
   try {
-    const parsed = JSON.parse(await fs.readFile(DB_PATH, "utf8")) as { calculators?: StoredCalculator[] };
-    const calculators = (parsed.calculators ?? []).map((raw) =>
-      raw.formula
-        ? raw
-        : { ...raw, formula: { kind: "expression" as const, expression: raw.expression ?? "" } },
-    );
-    return { calculators };
+    const stat = await fs.stat(DB_PATH);
+    return `${stat.mtimeMs}:${stat.size}`;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    await write(SEED);
-    return SEED;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
   }
 }
 
-async function write(db: Db): Promise<void> {
-  await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-  await fs.writeFile(DB_PATH, `${JSON.stringify(db, null, 2)}\n`, "utf8");
+function normalize(raw: StoredCalculator): Calculator {
+  const { expression, ...rest } = raw;
+  // Pre-formula data stored a bare `expression` string instead of a formula object.
+  return rest.formula ? rest : { ...rest, formula: { kind: "expression", expression: expression ?? "" } };
 }
 
-export async function getCalculators(): Promise<Calculator[]> {
-  const db = await withLock(() => read());
-  return db.calculators;
+/** Reads the database without locking — only call it from inside `withLock`. */
+async function readUnlocked(): Promise<Db> {
+  const key = await diskKey();
+  if (key !== null && cacheEntry?.key === key) return cacheEntry.db;
+
+  let db: Db;
+  try {
+    const parsed = JSON.parse(await fs.readFile(DB_PATH, "utf8")) as { calculators?: StoredCalculator[] };
+    db = { calculators: (parsed.calculators ?? []).map(normalize) };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    // Fresh UUIDs per process so independently-seeded instances don't collide.
+    db = { calculators: SEED.calculators.map((calculator) => ({ ...calculator, id: randomUUID() })) };
+    await write(db);
+  }
+  if (key !== null) cacheEntry = { key, db };
+  return db;
 }
+
+/** A deep copy of `db`, for cheap change detection in `mutate`. */
+function snapshot(db: Db): string {
+  return JSON.stringify(db);
+}
+
+/** Atomic write: temp file in the same directory, then rename over the target. */
+async function write(db: Db): Promise<void> {
+  await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+  const tmpPath = `${DB_PATH}.${process.pid}.${randomUUID()}.tmp`;
+  await fs.writeFile(tmpPath, `${JSON.stringify(db, null, 2)}\n`, "utf8");
+  await fs.rename(tmpPath, DB_PATH);
+  const stat = await fs.stat(DB_PATH);
+  cacheEntry = { key: `${stat.mtimeMs}:${stat.size}`, db };
+}
+
+/**
+ * Request-scoped via React's `cache()`: `generateMetadata` and the page share
+ * one read per request instead of two. Returns a fresh copy each call so
+ * callers (e.g. `mutate`) can safely mutate the array before persisting it.
+ */
+export const getCalculators = cache(async (): Promise<Calculator[]> => {
+  const db = await withLock(readUnlocked);
+  return [...db.calculators];
+});
 
 /** Mutate the list in place and persist it. `fn` must be synchronous. */
 export async function mutate<T>(fn: (calculators: Calculator[]) => T): Promise<T> {
+  let changed = false;
   const result = await withLock(async () => {
-    const db = await read();
+    const db = await readUnlocked();
+    const before = snapshot(db); // deep copy — fn mutates `db` in place
     const value = fn(db.calculators);
-    await write(db);
+    changed = snapshot(db) !== before;
+    // Skip the write when the mutation changed nothing, e.g. a slug collision
+    // that returned an error before touching the list.
+    if (changed) await write(db);
     return value;
   });
-  revalidatePath("/", "layout");
+  if (changed) revalidatePath("/", "layout");
   return result;
 }

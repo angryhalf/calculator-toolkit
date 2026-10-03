@@ -1,0 +1,39 @@
+{
+  "node": {
+    "602a6370906b34c94f61d7b3fde55bd77abe6c9ea7": {
+      "workers": {
+        "app/[[...slug]]/page": {
+          "moduleId": 77547,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/lib/actions.ts",
+      "exportedName": "saveCalculator"
+    },
+    "4002a382e09d8d9d6e15bf47f3a1dbd5570c68d558": {
+      "workers": {
+        "app/[[...slug]]/page": {
+          "moduleId": 77547,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/lib/actions.ts",
+      "exportedName": "deleteCalculator"
+    },
+    "40d1f995e536e86e58509d1775ab8023b23f1711ca": {
+      "workers": {
+        "app/[[...slug]]/page": {
+          "moduleId": 77547,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/lib/actions.ts",
+      "exportedName": "deleteSubject"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "8Ch3iaTnrW+JFO2CchIpWvFPdQKfOkSpscu1p98pVqo="
+}

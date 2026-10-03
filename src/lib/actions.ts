@@ -11,6 +11,35 @@ export type FormState = { error: string } | null;
 
 const VARIABLE_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+type Row = { variable: string; explicit: boolean };
+
+/** Validates one input/step row's variable against the shared `taken` set
+ *  (updated with the lowercase name when the row passes). Returns an error
+ *  message, or null. */
+function validateRow(row: Row, taken: Set<string>, kind: "input" | "step", index: number): string | null {
+  const at = `${kind} ${index + 1}`;
+  if (!VARIABLE_PATTERN.test(row.variable)) {
+    return kind === "input"
+      ? `${at}: give it a label starting with a letter — the label becomes the formula variable, and units in parentheses are ignored (e.g. "Mass (kg)" → mass).`
+      : `${at}: give it a label starting with a letter — it becomes the variable later steps can use.`;
+  }
+  // The evaluator resolves names case-insensitively, so reserved words must be
+  // rejected case-insensitively too ("SQRT", "Pi", …). Only labels that were
+  // auto-derived from text get this check; explicit variables (carried over
+  // from existing calculators) are grandfathered.
+  if (!row.explicit && RESERVED_WORDS.has(row.variable.toLowerCase())) {
+    return `${at}: its label would become "${row.variable}", which is reserved — use a different label.`;
+  }
+  // Uniqueness applies to every row, explicit or derived — two inputs with the
+  // same variable silently collide in the formula scope otherwise.
+  const lower = row.variable.toLowerCase();
+  if (taken.has(lower)) {
+    return `"${row.variable}" is used by more than one input or step — labels must be distinct.`;
+  }
+  taken.add(lower);
+  return null;
+}
+
 export async function saveCalculator(_prev: FormState, formData: FormData): Promise<FormState> {
   const id = (formData.get("id") as string | null) ?? undefined;
   const name = String(formData.get("name") ?? "").trim();
@@ -44,22 +73,12 @@ export async function saveCalculator(_prev: FormState, formData: FormData): Prom
   if (subject && isReserved(subject)) return { error: `"${subjectName}" is a reserved subject name.` };
 
   // Names must resolve uniquely, case-insensitively. Variables carried over
-  // from existing calculators are grandfathered in; newly derived ones are checked.
+  // from existing calculators are grandfathered; newly derived ones are checked.
   const taken = new Set<string>();
   for (const [i, input] of inputs.entries()) {
     const explicit = (variables[i] ?? "").trim() !== "";
-    if (!VARIABLE_PATTERN.test(input.variable)) {
-      return { error: `Input ${i + 1}: give it a label starting with a letter — the label becomes the formula variable, and units in parentheses are ignored (e.g. "Mass (kg)" → mass).` };
-    }
-    if (!explicit) {
-      if (RESERVED_WORDS.has(input.variable)) {
-        return { error: `Input ${i + 1}: its label would become "${input.variable}", which is reserved — use a different label.` };
-      }
-      if (taken.has(input.variable)) {
-        return { error: `"${input.variable}" is used by more than one input or step — labels must be distinct.` };
-      }
-    }
-    taken.add(input.variable.toLowerCase());
+    const error = validateRow({ variable: input.variable, explicit }, taken, "input", i);
+    if (error) return { error };
   }
 
   // Build the formula from whichever mode the form used.
@@ -76,18 +95,8 @@ export async function saveCalculator(_prev: FormState, formData: FormData): Prom
       const explicit = (stepVariables[i] ?? "").trim();
       const variable = explicit || variableFromLabel(label);
       const expression = (stepExpressions[i] ?? "").trim();
-      if (!VARIABLE_PATTERN.test(variable)) {
-        return { error: `Step ${i + 1}: give it a label starting with a letter — it becomes the variable later steps can use.` };
-      }
-      if (!explicit) {
-        if (RESERVED_WORDS.has(variable)) {
-          return { error: `Step ${i + 1}: its label would become "${variable}", which is reserved — use a different label.` };
-        }
-        if (taken.has(variable)) {
-          return { error: `"${variable}" is used by more than one input or step — labels must be distinct.` };
-        }
-      }
-      taken.add(variable.toLowerCase());
+      const error = validateRow({ variable, explicit: explicit !== "" }, taken, "step", i);
+      if (error) return { error };
       if (!expression) return { error: `Step ${i + 1}: expression is required.` };
       steps.push({ label: label || variable, variable, expression });
     }

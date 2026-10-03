@@ -1,5 +1,5 @@
 // Subject slugs can't collide with app routes.
-const RESERVED = ["calculators", "edit", "new", "api"] as const;
+const RESERVED = new Set(["calculators", "edit", "new", "api"]);
 
 export function slugify(text: string): string {
   return text
@@ -13,7 +13,7 @@ export function slugify(text: string): string {
 }
 
 export function isReserved(slug: string): boolean {
-  return (RESERVED as readonly string[]).includes(slug);
+  return RESERVED.has(slug);
 }
 
 /** Turns an input or step label into the variable name formulas use.
