@@ -23,8 +23,7 @@ function Grid({ calculators }: { calculators: Calculator[] }) {
   );
 }
 
-export function HomeView({ calculators }: { calculators: Calculator[] }) {
-  const subjects = [...new Set(calculators.map((c) => c.subject).filter((s): s is string => s !== null))];
+export function HomeView({ calculators, subjects }: { calculators: Calculator[]; subjects: string[] }) {
   const ungrouped = calculators.filter((c) => c.subject === null);
 
   return (

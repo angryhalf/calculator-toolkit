@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { cache } from "react";
 import { revalidatePath } from "next/cache";
 
 export type CalculatorInput = { label: string; variable: string; defaultValue: number };
@@ -30,6 +32,12 @@ type StoredCalculator = Calculator & { expression?: string };
 
 const DB_PATH = path.join(process.cwd(), "data", "calculators.json");
 
+/** NOTE: JSON-file persistence is only safe for a single Node process on a
+ *  writable disk. The in-process lock below does nothing on serverless or
+ *  multi-instance deployments (Vercel, etc.), where the file is typically
+ *  read-only or diverges per instance — swap this module for SQLite or a real
+ *  database before deploying that way. The file is gitignored and regenerated
+ *  from SEED on first read if missing. */
 const SEED: Db = {
   calculators: [
     { id: "quadratic-root", name: "Quadratic Root", slug: "quadratic-root", description: "Larger real root of ax² + bx + c = 0.", subject: "math",
@@ -122,22 +130,36 @@ async function read(): Promise<Db> {
 
 async function write(db: Db): Promise<void> {
   await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-  await fs.writeFile(DB_PATH, `${JSON.stringify(db, null, 2)}\n`, "utf8");
+  // Write to a temp file, then rename: rename is atomic on POSIX, so a crash
+  // mid-write can never leave a half-written (corrupt) database behind.
+  const tmpPath = `${DB_PATH}.${process.pid}.${randomUUID()}.tmp`;
+  await fs.writeFile(tmpPath, `${JSON.stringify(db, null, 2)}\n`, "utf8");
+  await fs.rename(tmpPath, DB_PATH);
 }
 
-export async function getCalculators(): Promise<Calculator[]> {
+// Per-request dedup: generateMetadata and Page both call this, but the file is
+// read and parsed only once per request (React cache() gives each request its
+// own copy, so writes + revalidatePath can never serve stale data across
+// requests).
+export const getCalculators = cache(async (): Promise<Calculator[]> => {
   const db = await withLock(() => read());
   return db.calculators;
-}
+});
 
-/** Mutate the list in place and persist it. `fn` must be synchronous. */
-export async function mutate<T>(fn: (calculators: Calculator[]) => T): Promise<T> {
-  const result = await withLock(async () => {
+/** Mutate the list in place and persist it. `fn` must be synchronous. If `fn`
+ *  returns a string, it's treated as an error: nothing is written and no paths
+ *  are revalidated. */
+export async function mutate<T>(fn: (calculators: Calculator[]) => T): Promise<T>;
+export async function mutate(fn: (calculators: Calculator[]) => string | null): Promise<string | null>;
+export async function mutate(fn: (calculators: Calculator[]) => unknown): Promise<unknown> {
+  return withLock(async () => {
     const db = await read();
     const value = fn(db.calculators);
+    // A returned string means the mutation was rejected — skip the write and
+    // the revalidation so unchanged data doesn't dirty the file or the cache.
+    if (typeof value === "string") return value;
     await write(db);
+    revalidatePath("/", "layout");
     return value;
   });
-  revalidatePath("/", "layout");
-  return result;
 }

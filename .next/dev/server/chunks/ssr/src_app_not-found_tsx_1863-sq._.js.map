@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///workspace/src/app/not-found.tsx"],"sourcesContent":["import Link from \"next/link\";\nimport { buttonVariants } from \"@/components/ui/button\";\n\nexport default function NotFound() {\n  return (\n    <div className=\"py-24 text-center\">\n      <p className=\"font-mono text-sm text-muted-foreground\">404</p>\n      <h1 className=\"mt-2 text-2xl font-semibold\">Not found</h1>\n      <p className=\"mt-1 text-muted-foreground\">This calculator or subject doesn’t exist (or was renamed).</p>\n      <Link href=\"/\" className={buttonVariants({ className: \"mt-6\" })}>\n        Back home\n      </Link>\n    </div>\n  );\n}\n"],"names":["NotFound","className","href"],"mappings":";;;;;AAAA;AACA;;;;AAEe,SAASA;IACtB,qBACE,8OAAC;QAAIC,WAAU;;0BACb,8OAAC;gBAAEA,WAAU;0BAA0C;;;;;;0BACvD,8OAAC;gBAAGA,WAAU;0BAA8B;;;;;;0BAC5C,8OAAC;gBAAEA,WAAU;0BAA6B;;;;;;0BAC1C,8OAAC,0LAAI;gBAACC,MAAK;gBAAID,WAAW,IAAA,oJAAc,EAAC;oBAAEA,WAAW;gBAAO;0BAAI;;;;;;;;;;;;AAKvE"}}]
+}

@@ -4,6 +4,7 @@ import { CalculatorForm } from "@/components/calculator-form";
 import { CalculatorView, HomeView, SubjectView, UngroupedView } from "@/components/views";
 import { titleize } from "@/lib/slug";
 import { getCalculators } from "@/lib/store";
+import type { Calculator } from "@/lib/store";
 
 // Data lives in a JSON file that changes on every write, so always render on request.
 export const dynamic = "force-dynamic";
@@ -13,13 +14,24 @@ type Props = {
   searchParams: Promise<{ id?: string; subject?: string }>;
 };
 
+/** Subjects are just the set of slugs some calculator references — computed
+ *  once per request here and passed down, instead of being re-derived in
+ *  page.tsx and again inside HomeView. */
+function computeSubjects(calculators: Calculator[]): string[] {
+  return [...new Set(calculators.map((c) => c.subject).filter((s): s is string => s !== null))];
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug = [] } = await params;
   const [a, b] = slug;
   if (!a) return {};
   if (a === "edit") return { title: "Calculator editor" };
   if (b) {
-    const calculator = (await getCalculators()).find((c) => c.slug === b && c.subject === (a === "calculators" ? null : a));
+    // getCalculators is wrapped in React cache(), so this shares the single
+    // per-request file read with Page below.
+    const calculator = (await getCalculators()).find(
+      (c) => c.slug === b && c.subject === (a === "calculators" ? null : a),
+    );
     return { title: calculator?.name ?? "Not found" };
   }
   return { title: titleize(a) };
@@ -30,6 +42,7 @@ export default async function Page({ params, searchParams }: Props) {
   if (slug.length > 2) notFound();
 
   const calculators = await getCalculators();
+  const subjects = computeSubjects(calculators);
   const [a, b] = slug;
 
   // /edit — create, or update with ?id=
@@ -37,7 +50,6 @@ export default async function Page({ params, searchParams }: Props) {
     if (b) notFound();
     const calculator = query.id ? calculators.find((c) => c.id === query.id) : undefined;
     if (query.id && !calculator) notFound();
-    const subjects = [...new Set(calculators.map((c) => c.subject).filter((s): s is string => s !== null))];
     return <CalculatorForm key={calculator?.id ?? "new"} subjects={subjects} calculator={calculator} initialSubject={query.subject} />;
   }
 
@@ -49,7 +61,7 @@ export default async function Page({ params, searchParams }: Props) {
   }
 
   // / — home
-  if (!a) return <HomeView calculators={calculators} />;
+  if (!a) return <HomeView calculators={calculators} subjects={subjects} />;
 
   // /<subject> — subject page (a subject exists only while it has calculators)
   if (!b) {

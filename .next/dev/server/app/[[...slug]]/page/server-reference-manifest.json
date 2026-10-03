@@ -1,0 +1,38 @@
+{
+  "node": {
+    "409fbf41b484d7f196f6ba6ea0979b66f49e5861b8": {
+      "workers": {
+        "app/[[...slug]]/page": {
+          "moduleId": "[project]/.next-internal/server/app/[[...slug]]/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/lib/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "deleteCalculator",
+      "filename": "src/lib/actions.ts"
+    },
+    "40e16da48c74d2746e7fcf9e4f3c02556e468e00c9": {
+      "workers": {
+        "app/[[...slug]]/page": {
+          "moduleId": "[project]/.next-internal/server/app/[[...slug]]/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/lib/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "deleteSubject",
+      "filename": "src/lib/actions.ts"
+    },
+    "608ae401ecb9de7e74b74e960f43afc1616d1d42db": {
+      "workers": {
+        "app/[[...slug]]/page": {
+          "moduleId": "[project]/.next-internal/server/app/[[...slug]]/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/lib/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "saveCalculator",
+      "filename": "src/lib/actions.ts"
+    }
+  },
+  "edge": {}
+}

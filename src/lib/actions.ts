@@ -9,7 +9,29 @@ import type { Calculator, CalculationStep } from "@/lib/store";
 
 export type FormState = { error: string } | null;
 
-const VARIABLE_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+type Row = { label: string; variable: string; explicit: boolean };
+
+/** Shared validation for input rows and step rows — one code path so the two
+ *  can't drift apart. Names must resolve uniquely, case-insensitively (the
+ *  evaluator lowercases names), so both the reserved-word and duplicate
+ *  checks compare lowercase. Explicit variables are grandfathered against the
+ *  reserved-word check only (they predate it); the duplicate check applies to
+ *  every row, because two inputs in the same calculator sharing a variable
+ *  silently collide in scope. */
+function validateRow(row: Row, taken: Set<string>, kind: "Input" | "Step"): string | null {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(row.variable)) {
+    return kind === "Input"
+      ? "give it a label starting with a letter — the label becomes the formula variable, and units in parentheses are ignored (e.g. \"Mass (kg)\" → mass)."
+      : "give it a label starting with a letter — it becomes the variable later steps can use.";
+  }
+  if (!row.explicit && RESERVED_WORDS.has(row.variable.toLowerCase())) {
+    return `its label would become "${row.variable}", which is reserved — use a different label.`;
+  }
+  if (taken.has(row.variable.toLowerCase())) {
+    return `"${row.variable}" is used by more than one input or step — labels must be distinct.`;
+  }
+  return null;
+}
 
 export async function saveCalculator(_prev: FormState, formData: FormData): Promise<FormState> {
   const id = (formData.get("id") as string | null) ?? undefined;
@@ -24,15 +46,10 @@ export async function saveCalculator(_prev: FormState, formData: FormData): Prom
   const labels = formData.getAll("label").map(String);
   const variables = formData.getAll("variable").map(String);
   const defaults = formData.getAll("default").map(String);
-  const inputs = labels.map((label, i) => {
+  const inputRows: Row[] = labels.map((label, i) => {
     const explicit = (variables[i] ?? "").trim();
     const derived = explicit || variableFromLabel(label);
-    const fallback = Number(defaults[i]);
-    return {
-      label: label.trim() || derived,
-      variable: derived,
-      defaultValue: Number.isFinite(fallback) ? fallback : 0,
-    };
+    return { label: label.trim() || derived, variable: derived, explicit: explicit !== "" };
   });
 
   if (!name) return { error: "Name is required." };
@@ -43,24 +60,16 @@ export async function saveCalculator(_prev: FormState, formData: FormData): Prom
   if (subjectName && !subject) return { error: `"${subjectName}" can't be turned into a URL slug.` };
   if (subject && isReserved(subject)) return { error: `"${subjectName}" is a reserved subject name.` };
 
-  // Names must resolve uniquely, case-insensitively. Variables carried over
-  // from existing calculators are grandfathered in; newly derived ones are checked.
   const taken = new Set<string>();
-  for (const [i, input] of inputs.entries()) {
-    const explicit = (variables[i] ?? "").trim() !== "";
-    if (!VARIABLE_PATTERN.test(input.variable)) {
-      return { error: `Input ${i + 1}: give it a label starting with a letter — the label becomes the formula variable, and units in parentheses are ignored (e.g. "Mass (kg)" → mass).` };
-    }
-    if (!explicit) {
-      if (RESERVED_WORDS.has(input.variable)) {
-        return { error: `Input ${i + 1}: its label would become "${input.variable}", which is reserved — use a different label.` };
-      }
-      if (taken.has(input.variable)) {
-        return { error: `"${input.variable}" is used by more than one input or step — labels must be distinct.` };
-      }
-    }
-    taken.add(input.variable.toLowerCase());
+  for (const [i, row] of inputRows.entries()) {
+    const problem = validateRow(row, taken, "Input");
+    if (problem) return { error: `Input ${i + 1}: ${problem}` };
+    taken.add(row.variable.toLowerCase());
   }
+  const inputs = inputRows.map((row, i) => {
+    const fallback = Number(defaults[i]);
+    return { label: row.label, variable: row.variable, defaultValue: Number.isFinite(fallback) ? fallback : 0 };
+  });
 
   // Build the formula from whichever mode the form used.
   let formula: Calculator["formula"];
@@ -76,17 +85,8 @@ export async function saveCalculator(_prev: FormState, formData: FormData): Prom
       const explicit = (stepVariables[i] ?? "").trim();
       const variable = explicit || variableFromLabel(label);
       const expression = (stepExpressions[i] ?? "").trim();
-      if (!VARIABLE_PATTERN.test(variable)) {
-        return { error: `Step ${i + 1}: give it a label starting with a letter — it becomes the variable later steps can use.` };
-      }
-      if (!explicit) {
-        if (RESERVED_WORDS.has(variable)) {
-          return { error: `Step ${i + 1}: its label would become "${variable}", which is reserved — use a different label.` };
-        }
-        if (taken.has(variable)) {
-          return { error: `"${variable}" is used by more than one input or step — labels must be distinct.` };
-        }
-      }
+      const problem = validateRow({ label: label || variable, variable, explicit: explicit !== "" }, taken, "Step");
+      if (problem) return { error: `Step ${i + 1}: ${problem}` };
       taken.add(variable.toLowerCase());
       if (!expression) return { error: `Step ${i + 1}: expression is required.` };
       steps.push({ label: label || variable, variable, expression });
@@ -122,7 +122,9 @@ export async function saveCalculator(_prev: FormState, formData: FormData): Prom
   }
 
   const calculator: Calculator = { id: id ?? randomUUID(), name, slug, description, subject, inputs, formula, unit };
-  const error = await mutate<string | null>((calculators) => {
+  // Returning a string from the callback signals an error to mutate(): the
+  // file is left untouched and nothing is revalidated.
+  const error = await mutate((calculators) => {
     if (calculators.some((c) => c.slug === slug && c.id !== calculator.id)) {
       return `A calculator with the slug "${slug}" already exists — pick a different name.`;
     }
